@@ -1,0 +1,120 @@
+import numpy as np
+import random 
+from numpy import *
+
+# shuffle the data
+def Shuffle(x,y):
+    np.random.shuffle(x)
+    np.random.shuffle(y)
+    
+# relu forward
+def Relu_forward(z):
+    h = np.maximum(0,z)
+    return h
+    
+# relu backward
+def Relu_backward(dh):
+    dz = np.where(dh<=0,0,1)
+    return dz
+    
+# softmax function
+# h: relu function
+def Softmax(z):
+    exp = np.exp(z)
+    s = np.sum(exp,axis=1, keepdims=True)
+    y_hat = exp/s    
+    return y_hat
+    
+# initialize parameters
+# layer_num, unit_num
+def Initial_parameter():
+    w = []
+    b = []
+    # w1 and b1
+    w.append(random.randn(784,unit_num)*0.01)
+    b.append(random.randn(1,unit_num)*0.01)
+    for i in range(layer_num-1):
+        weight = random.randn(unit_num,unit_num)
+        w.append(weight*0.01)
+        bias = random.randn(1,unit_num)
+        b.append(bias*0.01)
+    # final w and b before softmax
+    w.append(random.randn(unit_num,10)*0.01)
+    b.append(random.randn(1,10)*0.01)
+    return w, b
+    
+# forward
+# layer_num
+def Forward(x, w, b):
+    h = []  # relu z
+    z = []
+    z_element = np.dot(x, w[0])+b[0]
+    z.append(z_element)
+    for i in range (layer_num):
+        hidden = Relu_forward(z_element)
+        h.append(hidden)
+        z_element = np.dot(hidden, w[i+1]) + b[i+1]
+        z.append(z_element)
+    y_hat = Softmax(z[layer_num])
+    return y_hat, h, z 
+    
+# backward
+# alpha, layer_num
+def Backward(x, y, y_hat, w, b, h, z):
+    dw = []
+    db = []
+    n = x.shape[1]
+    # n = batch_size
+    index = list(range(0, layer_num, 1))
+    index = index[:: -1] + np.array([1]) # 倒序 index， 除去 index = 0
+    g = (y_hat - y)/n
+    db.append(np.sum(g,axis = 0))   # 列求和取平均
+    for i in index:
+        d_weight = np.dot(h[i-1].T, g) + alpha * w[i]
+        dw.append(d_weight)
+        g = np.dot(g, w[i].T) * Relu_backward(z[i-1])
+        db.append(np.sum(g,axis = 0))
+    d_weight = np.dot(x.T,g) + alpha * w[0]
+    dw.append(d_weight)
+    dw.reverse()
+    db.reverse()
+    return dw, db
+    
+# accuracy
+def Accuracy(y, y_hat):
+    falseNum = np.count_nonzero(np.argmax(y_hat, axis = 1) -  np.argmax(y, axis = 1))
+    return (y.shape[0] - falseNum)/ y.shape[0]
+    
+# SGD
+def SGD(x, y, X_val, Y_val):
+    w, b = Initial_parameter() 
+    for i in range(epoch):
+        index = np.random.choice(x.shape[0], x.shape[0], replace = False)
+        x = x[index]
+        y = y[index]
+        for j in range(int(x.shape[0]/batch_size)):
+            x_batch = x[j * batch_size:(j + 1) * batch_size, :]
+            y_batch = y[j * batch_size:(j + 1) * batch_size, :]
+            y_hat, h, z = Forward(x_batch, w, b)
+            dw, db = Backward(x_batch, y_batch, y_hat, w, b, h, z)
+            for p in range(layer_num+1):
+                w[p] = w[p] - learning_rate * dw[p]
+                b[p] = b[p] - learning_rate * db[p]
+        y_hat1,h1,z1 = Forward(X_val, w, b)
+        accu = Accuracy(Y_val, y_hat1)
+        #learning_rate *= 0.95
+        print(i+1,"accuracy:", accu)
+    return w, b
+ 
+# try hyperparameter
+x = np.load("mnist_train_images.npy")
+y = np.load("mnist_train_labels.npy")
+x_val = np.load("mnist_validation_images.npy")
+y_val = np.load("mnist_validation_labels.npy")
+layer_num = 2
+unit_num = 40
+alpha = 0
+batch_size = 64
+learning_rate = 75e-2
+epoch = 30
+w,b = SGD(x,y,x_val,y_val)
